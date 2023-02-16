@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Buy
+{% endblock %}
+
+{% block main %}
+    <h1>Buy some shares</h1>
+    <form action="/buy" method="post" style = "width: 500px; margin: auto">
+        <label for="symbol">Stock Symbol</label>
+        <input type="text" name ="symbol" id="symbol" class="form-control">
+        <label for="number">Number of Shares</label>
+        <input type="text" name ="number" class="form-control">
+        <div class ="mb-3" style = "margin: 20px">
+            <button type="submit" class="btn btn-primary">Buy</button>
+        </div>
+
+    </form>
+{% endblock %}
