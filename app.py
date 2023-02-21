@@ -5,6 +5,7 @@ from flask import Flask, flash, redirect, render_template, request, session
 from flask_session import Session
 from tempfile import mkdtemp
 from werkzeug.security import check_password_hash, generate_password_hash
+from operator import itemgetter
 
 from helpers import apology, login_required, lookup, usd
 
@@ -47,7 +48,7 @@ def index():
     username = db.execute("SELECT username FROM users WHERE id = ?", session["user_id"])[0]['username']
 
     # Get the relevant information from display table
-    output = db.execute("SELECT symbol, amount FROM display WHERE user_id = ?", session["user_id"])
+    output = db.execute("SELECT symbol, amount FROM display WHERE user_id = ? ORDER BY shares_value DESC", session["user_id"])
 
     # Create an empty list of dictionaries
     data = []
@@ -56,23 +57,19 @@ def index():
     for dict_item in output:
         symbol = dict_item['symbol']
         amount = dict_item['amount']
-        # Remove row from table if no shares of stock owned for data cleaning
-        if amount == 0:
-            db.execute("DELETE FROM display WHERE user_id = ? AND symbol = ?", symbol, amount)
-            continue
 
-        else:
-            # Get the relevant information about the company from lookup
-            company = lookup(symbol)
-            # Create a new dict_item to pass into index
-            item = {}
-            item['symbol'] = symbol
-            item['name'] = company['name']
-            item['amount'] = amount
-            item['price'] = usd(company['price'])
-            item['total'] = usd(company['price'] * amount)
-            shares_value = shares_value + company['price'] * amount
-            data.append(item)
+
+        # Get the relevant information about the company from lookup
+        company = lookup(symbol)
+        # Create a new dict_item to pass into index
+        item = {}
+        item['symbol'] = symbol
+        item['name'] = company['name']
+        item['amount'] = amount
+        item['price'] = usd(company['price'])
+        item['total'] = usd(company['price'] * amount)
+        shares_value = shares_value + company['price'] * amount
+        data.append(item)
 
     cash = db.execute("SELECT cash FROM users WHERE id = ?", session["user_id"])[0]["cash"]
     cash_display = usd(cash)
@@ -100,6 +97,8 @@ def buy():
             amount = int(request.form.get("number"))
             # for time we shall use SQLite to get this.
             price = company["price"]
+            # calculate the value of the transaction
+            shares_value = price * amount
             # need to calculate balance
             # find the initial amount of money
             current_balance = db.execute("SELECT cash FROM users WHERE id = ?", user_id)[0]["cash"]
@@ -117,14 +116,18 @@ def buy():
             owns_stock = db.execute("SELECT * FROM display WHERE user_id = ? and symbol = ?", user_id, symbol)
             if not owns_stock:
                 # make a new entry in the table;
-                db.execute("INSERT INTO display (user_id, symbol, amount) VALUES (?, ?, ?)", user_id, symbol, amount)
+                db.execute("INSERT INTO display (user_id, symbol, amount, shares_value) VALUES (?, ?, ?, ?)", user_id, symbol, amount, shares_value)
             else:
                 # otherwise modify the existing entry
                 # find initial amount
                 initial_amount = db.execute("SELECT amount FROM display WHERE user_id = ? and symbol = ?", user_id, symbol)[0]['amount']
                 # calculate new amount
                 new_amount = initial_amount + amount
-                db.execute("UPDATE display SET amount = ? WHERE user_id = ? and symbol = ?", new_amount, user_id, symbol)
+                # calculate new value
+                # find initial value
+                initial_value = db.execute("SELECT shares_value FROM display WHERE user_id = ? and symbol = ?", user_id, symbol)[0]['shares_value']
+                new_value = initial_value + value
+                db.execute("UPDATE display SET amount = ?, shares_value = ? WHERE user_id = ? and symbol = ?", new_amount, shares_value, user_id, symbol)
             # Caclulate value
             return render_template("bought.html", symbol = symbol, amount = amount, price = usd(price), cost = usd(cost), balance = usd(new_balance))
 
@@ -156,7 +159,7 @@ def login():
 
         # Ensure username exists and password is correct
         if len(rows) != 1 or not check_password_hash(rows[0]["hash"], request.form.get("password")):
-            return apology("Invalid username or password", 403)
+            return apology("Invalid username or password. Usernames are also case sensitive", 403)
 
         # Remember which user has logged in
         session["user_id"] = rows[0]["id"]
@@ -262,36 +265,96 @@ def sell():
 
         if amount > amount_owned:
             return apology("You are attempting to sell more shares than you own")
-
-        # Update the relevant tables
-
-        # Update purchases
+        
         # get share value
         price = lookup(symbol)['price']
 
         # get transaction value
         transaction_value = price * amount
 
-        # calculate balance
         # get current balance
         current_balance = db.execute("SELECT cash FROM users WHERE id = ?", session['user_id'])[0]['cash']
         new_balance = current_balance + transaction_value
+        
+        if amount == amount_owned:
+            # Delete the records from the tables
+            db.execute("DELETE FROM display WHERE user_id = ? AND symbol = ?", session['user_id'], symbol)
+            # Do the rest of the steps
 
-        # enter all the values into the table
-        db.execute("INSERT INTO purchases (users_id, symbol, amount, timestamp, price, balance, type) VALUES (?, ?, ?, datetime('now'), ?, ?, ?)", session['user_id'], symbol, amount, price, new_balance, "sell")
+            # enter all the values into the purchases table
+            db.execute("INSERT INTO purchases (users_id, symbol, amount, timestamp, price, balance, type) VALUES (?, ?, ?, datetime('now'), ?, ?, ?)", session['user_id'], symbol, amount, price, new_balance, "sell")
+            # Update users
+            db.execute("UPDATE users SET cash = ? WHERE id = ?", new_balance, session['user_id'])
 
-        # Update users
-        db.execute("UPDATE users SET cash = ? WHERE id = ?", new_balance, session['user_id'])
+        else: 
+            # enter all the values into the purchases table
+            db.execute("INSERT INTO purchases (users_id, symbol, amount, timestamp, price, balance, type) VALUES (?, ?, ?, datetime('now'), ?, ?, ?)", session['user_id'], symbol, amount, price, new_balance, "sell")
 
-        # Update display
-        # Calculate the new amount
-        # Get the current amount
-        current_amount = db.execute("SELECT amount FROM display WHERE user_id = ? AND symbol = ?", session['user_id'], symbol)[0]['amount']
-        new_amount = current_amount - amount
+            # Update users
+            db.execute("UPDATE users SET cash = ? WHERE id = ?", new_balance, session['user_id'])
 
-        db.execute("UPDATE display SET amount = ? WHERE user_id = ? AND symbol = ?", new_amount, session['user_id'], symbol)
+            # Update display
+            # Calculate the new amount
+            # Get the current amount
+            current_amount = db.execute("SELECT amount FROM display WHERE user_id = ? AND symbol = ?", session['user_id'], symbol)[0]['amount']
+            new_amount = current_amount - amount
+
+            # Calculate the new shares_value
+            # Get the old shares value
+            current_shares_value = db.execute("SELECT shares_value FROM display WHERE user_id = ? AND symbol = ?", session['user_id'], symbol)[0]['shares_value']
+            new_shares_value = current_shares_value - transaction_value
+            db.execute("UPDATE display SET amount = ?, shares_value = ? WHERE user_id = ? AND symbol = ?", new_amount, new_shares_value, session['user_id'], symbol)
         return redirect("/")
 
+@app.route("/leaderboard")
+@login_required
+def leaderboard():
+    # Fill up the leaderboard table
+    # Get the username, shares_value from display, and order it right now. 
+    # Just get all of them, and then we can just take the top 3 now, we'll have to loop through all of the data anyway. 
+    output = db.execute("SELECT id FROM users")
+    # For every id, run the display query; 
+    ids = []
+    leaderboard = []
+    for dict_item in output:
+        ids.append(dict_item['id'])
+    for id in ids:
+        # Get their display table 
+        display_table = db.execute("SELECT * FROM display WHERE user_id = ? ORDER BY shares_value DESC", id)
+        net_worth = 0
+        most_used_shares = []
+        for i in range(len(display_table)):
+            net_worth += display_table[i]['shares_value']
+            if i < 3:
+                most_used_shares.append(display_table[i]['symbol'])
+            # Calculate their net worth and get their most used shares
+        # Last step is to add cash into the calculation of networth
+        # Also get username from here
+        users_output = db.execute("SELECT cash, username FROM users WHERE id = ?", id)
+        net_worth += users_output[0]['cash']
+        username = users_output[0]['username']
+        # Convert the list of most used shares into a string
+        string = ", ".join(most_used_shares)
+        # Now just add all of the information into the dictionary
+        display_dict_item = {}
+        display_dict_item['username'] = username
+        display_dict_item['net_worth'] = net_worth
+        display_dict_item['most_used_shares'] = string 
+        leaderboard.append(display_dict_item)
+
+    # Sort the dictionary, then pass it into leaderboard
+    sorted_leaderboard = sorted(leaderboard, key=itemgetter('net_worth'), reverse=True)
+    # add variable to represent position
+    for i in range(len(sorted_leaderboard)):
+        sorted_leaderboard[i]["position"] = i+1
+        sorted_leaderboard[i]['net_worth'] = usd(sorted_leaderboard[i]['net_worth'])
+    print(sorted_leaderboard)
+
+
+
+    # Perhaps whilst we're going through display, also get the most used shares as well. 
+    # Then at the end get the cash. 
+    return render_template("leaderboard.html", leaderboard = sorted_leaderboard)
 
 
 
