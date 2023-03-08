@@ -5,7 +5,7 @@
 
 
 ## Summary
-DulanFinance is a web app that allows logged-in users to "buy" and "sell" stocks (with virtal money) as well as look up real stock quotes fetched from IEX API. Users can also view their stock portfolio transaction history. This is based off PSET8 from Harvard's CS50 Course. 
+DulanFinance is a web app that allows logged-in users to "buy" and "sell" stocks (with virtual money) as well as look up real stock quotes fetched from IEX API. Users can also view their stock portfolio transaction history. This is based off PSET8 from Harvard's CS50 Course. 
 
 ## Technologies
 * Python
