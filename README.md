@@ -31,7 +31,7 @@ Passwords are securely encrypted using hashing from werkzeug security module.
 Allows a user to login with username and password. 
 
 ### Index
-The homepage displays a table of the logged-in user's owned stocks, number of shares, current stock price, value of each holding. This view also shows the user's cash balance and the total of their cash plus stock value. (Shown in Screenshot at the top)
+The homepage displays a table of the logged-in user's owned stocks, number of shares, current stock price, value of each holding. This view also shows the user's cash balance and the total of their cash plus stock value. (Shown in screenshot at the top)
 
 ### Quote
 Allows the user to submit a form to look up a stock's current price, retrieving real-time data from the IEX API. An error message is rendered if the stock symbol is invalid.
@@ -47,7 +47,7 @@ Allows the user to "sell" shares of any stock currently owned in their portfolio
 <img width="1512" alt="Screenshot 2023-03-27 at 23 15 39" src="https://user-images.githubusercontent.com/59977585/228079409-797b89f7-f0bc-4220-ac23-33614e4d866a.png">
 
 ### Leaderboard
-Displays a table showing the total balance of all other users (calculated in real time), and their most invested in companies. 
+Displays a table showing the total balance of all other users. Calculated in real time retreiving data from the IEX API. Also shows each users' most invested in companies. 
 <img width="1512" alt="Screenshot 2023-03-27 at 23 15 19" src="https://user-images.githubusercontent.com/59977585/228079193-e656cc69-aa8d-4305-ab29-931c44b04ffd.png">
 
 
