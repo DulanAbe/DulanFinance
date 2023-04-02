@@ -95,7 +95,6 @@ def buy():
             user_id = session["user_id"]
             symbol = company["symbol"]
             amount = int(request.form.get("number"))
-            # for time we shall use SQLite to get this.
             price = company["price"]
             # calculate the value of the transaction
             shares_value = price * amount
@@ -311,7 +310,6 @@ def sell():
 def leaderboard():
     # Fill up the leaderboard table
     # Get the username, shares_value from display, and order it right now. 
-    # Just get all of them, and then we can just take the top 3 now, we'll have to loop through all of the data anyway. 
     output = db.execute("SELECT id FROM users")
     # For every id, run the display query; 
     ids = []
@@ -328,7 +326,6 @@ def leaderboard():
             if i < 3:
                 most_used_shares.append(display_table[i]['symbol'])
             # Calculate their net worth and get their most used shares
-        # Last step is to add cash into the calculation of networth
         # Also get username from here
         users_output = db.execute("SELECT cash, username FROM users WHERE id = ?", id)
         net_worth += users_output[0]['cash']
@@ -350,10 +347,6 @@ def leaderboard():
         sorted_leaderboard[i]['net_worth'] = usd(sorted_leaderboard[i]['net_worth'])
     print(sorted_leaderboard)
 
-
-
-    # Perhaps whilst we're going through display, also get the most used shares as well. 
-    # Then at the end get the cash. 
     return render_template("leaderboard.html", leaderboard = sorted_leaderboard)
 
 
